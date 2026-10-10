@@ -109,3 +109,11 @@ export const simRecs = [
   ["Develop People","Teacher Coaching Cycle · Observation & Feedback · Mentoring New Staff"],
   ["Manage Operations","Budget Crisis · Scheduling Conflict · Safety Incident"],
 ];
+
+// Shown on the Review screen in sample mode to demonstrate the enrichment feature.
+export const sampleSuggestions = [
+  { title:"Monthly 1:1 Coaching Session", deets:"Category: Coaching/Mentoring · Recurrence: Monthly (Sep–May) · Evidence: Coaching Note · Competency: Develop People", rationale:"A consistent monthly coaching cadence with logged notes is the most common feature of strong leadership programs." },
+  { title:"Create Individual 70/20/10 Growth Plan", deets:"Category: Planning · Month: September · Evidence: Artifact + Approval", rationale:"Best-practice programs anchor growth in a 70/20/10 plan approved early in the year." },
+  { title:"Improvement Project — Mid-Point Review", deets:"Category: Project · Month: January · Evidence: Artifact", rationale:"A mid-year checkpoint keeps multi-month projects on track." },
+  { title:"End-of-Year Reflection & Next-Year Planning", deets:"Category: Reflection · Month: May · Evidence: Reflection", rationale:"Closing reflection plus forward planning sustains growth into the next cycle." },
+];

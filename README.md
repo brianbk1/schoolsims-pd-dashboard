@@ -52,6 +52,23 @@ Standard Vite app; `/api/extract.js` is auto-detected as a serverless function.
 - Output Directory: `dist`
 - Add `ANTHROPIC_API_KEY` (above), then deploy.
 
+## Best-practice enrichment
+When a client uploads an imperfect or thin plan, the extraction pass ALSO proposes
+anonymized **Suggested Additions** drawn from the strongest district programs
+SchoolSims has reviewed (curated in `src/bestPractices.js`). The AI:
+1. classifies the document archetype (leadership cohort / district PD system / induction),
+2. compares it to the best-practice benchmark for that archetype,
+3. proposes the highest-impact missing elements, each with a one-line rationale.
+
+Suggestions render in their own green section on the **AI Task Review** screen,
+visually distinct from district-source content and from SchoolSims product
+recommendations. They are optional ideas a human accepts, edits, or dismisses —
+never presented as the district's own requirements. If the model returns no
+suggestions, a local fallback in `src/normalize.js` offers curated ones by archetype.
+
+To expand the library, edit `src/bestPractices.js` (used for the fallback) and the
+`BENCHMARKS` block in `api/extract.js` (used in the prompt). Keep everything anonymized.
+
 ## Implementation rules honored
 - AI output is never auto-published; admin review + explicit publish required.
 - District-source items and SchoolSims AI recommendations stay distinct.

@@ -161,8 +161,8 @@ function Import({go,setModel}){
       {status==="done" && (
         <div className="card" style={{background:"var(--navy)",border:"none",display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:14}}>
           <div>
-            <div style={{color:"#fff",fontWeight:800,fontSize:16}}>Extraction complete — {resultCount} proposed items</div>
-            <div style={{color:"#A0B4CC",fontSize:12.5,marginTop:3}}>Nothing is assigned yet. Review and publish before participants see anything.</div>
+            <div style={{color:"#fff",fontWeight:800,fontSize:16}}>Extraction complete — {resultCount} proposed items + best-practice suggestions</div>
+            <div style={{color:"#A0B4CC",fontSize:12.5,marginTop:3}}>Review the extracted plan and the anonymized suggestions. Nothing is assigned until you publish.</div>
           </div>
           <button className="btn btn-primary" onClick={()=>go("review")}>Review Proposed Plan →</button>
         </div>
@@ -194,19 +194,21 @@ const pickMONTHC = SAMPLE.MONTH_COLORS
 function Review({go,model}){
   const districtItems = model ? model.districtItems : SAMPLE.districtItems
   const aiItems = model ? model.aiItems : SAMPLE.aiItems
-  const counts = model ? model.counts : {district:23,ai:4,flagged:3,published:0}
+  const suggestions = model ? model.suggestions : SAMPLE.sampleSuggestions
+  const gaps = model ? model.gaps : []
+  const counts = model ? model.counts : {district:23,ai:4,flagged:3,published:0,suggestions:(SAMPLE.sampleSuggestions||[]).length}
   const partCount = model ? model.program.participants : 42
   return (
     <div className="fade">
       <div className="crumb">Set Up › AI Task Review</div>
       <h1 className="pg">Review &amp; Publish Proposed Plan</h1>
-      <p className="pg-sub">AI drafted these from your documents. Accept, edit, merge, or reject each. District-sourced and AI-recommended items stay clearly separated.</p>
+      <p className="pg-sub">AI drafted these from your documents. Accept, edit, merge, or reject each. District-sourced content, best-practice suggestions, and SchoolSims recommendations stay clearly separated.</p>
       <div className="note">⚠ <b>Nothing here is live.</b> Items publish to participants only after you confirm. Low-confidence extractions are flagged for your attention.</div>
       <div className="tiles">
         <RTile v={counts.district} l="From District Plan" c="var(--district)"/>
+        <RTile v={counts.suggestions||0} l="Best-Practice Suggestions" c="var(--green)"/>
         <RTile v={counts.ai} l="SchoolSims AI Recommended" c="var(--ai)"/>
         <RTile v={counts.flagged} l="Flagged — Needs Review" c="var(--gold)"/>
-        <RTile v={counts.published} l="Published" c="var(--green)"/>
       </div>
       <div className="card">
         <h3>Extracted District Requirements <span className="sub">traceable to source document &amp; page</span></h3>
@@ -226,6 +228,33 @@ function Review({go,model}){
           </div>
         ))}
       </div>
+      {suggestions.length>0 && (
+        <div className="card" style={{background:"var(--green-l)",borderColor:"#B6D8C6"}}>
+          <h3 style={{color:"var(--green)"}}>Suggested Additions <span className="sub">anonymized best practices from the strongest district programs — optional, for your review</span></h3>
+          {gaps.length>0 && (
+            <div style={{fontSize:12.5,color:"#2E6B50",marginBottom:12,lineHeight:1.6}}>
+              <b>Gaps detected vs. best-practice programs:</b> {gaps.join(" · ")}
+            </div>
+          )}
+          {suggestions.map((it,i)=>(
+            <div className="trow" key={i} style={{borderLeft:"4px solid var(--green)"}}>
+              <div className="meta">
+                <div className="tt">{it.title}</div>
+                <div className="deets">{it.deets}</div>
+                {it.rationale && <div style={{fontSize:12,color:"#2E6B50",marginTop:2,marginBottom:6,fontStyle:"italic"}}>Why: {it.rationale}</div>}
+                <span className="tag" style={{background:"var(--green-l)",color:"var(--green)",border:"1px solid #B6D8C6"}}>Best-Practice Suggestion</span>
+              </div>
+              <div className="acts">
+                <button className="btn btn-ghost btn-sm">Dismiss</button>
+                <button className="btn btn-ghost btn-sm">Edit</button>
+                <button className="btn btn-primary btn-sm">Add to Plan</button>
+              </div>
+            </div>
+          ))}
+          <div className="src" style={{marginTop:6}}>These are examples drawn from high-performing programs, fully anonymized. Add the ones that fit; build the rest manually.</div>
+        </div>
+      )}
+
       {aiItems.length>0 && (
         <div className="card">
           <h3 style={{color:"var(--ai)"}}>SchoolSims AI Recommendations <span className="sub">optional additions — not from the district plan</span></h3>
