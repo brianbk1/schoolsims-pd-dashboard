@@ -6,13 +6,39 @@ import { normalize } from './normalize.js'
 const NAV = [
   { grp:"Set Up", items:[["import","📥","Plan Import"],["review","🧠","AI Task Review"]] },
   { grp:"Monitor", items:[["overview","📊","Cohort Overview"],["timeline","📅","Task Timeline"],["competencies","🎯","Competencies"],["heatmap","🔲","Cohort Heat Map"]] },
-  { grp:"Drill Down", items:[["participant","👤","Participant Detail"],["narrative","🤖","AI Narrative"]] },
+  { grp:"Drill Down", items:[["participant","👤","Participants"],["narrative","🤖","AI Narrative"]] },
 ]
+
+let _id = 1
+const uid = () => "id" + (_id++)
 
 export default function App(){
   const [screen,setScreen] = useState("import")
   const [model,setModel] = useState(null)   // normalized extraction result, or null = use sample
+  // In-session cohort + participant state (clears on refresh).
+  const [cohorts,setCohorts] = useState([])            // [{id,name,term}]
+  const [participants,setParticipants] = useState([])  // [{id,cohortId,name,role,school,email}]
+  const [selectedCohorts,setSelectedCohorts] = useState([]) // array of cohort ids (multi-select filter)
+  const [activeParticipant,setActiveParticipant] = useState(null) // id
+  const [showCohortForm,setShowCohortForm] = useState(false)
+
   const go = (s)=>{ setScreen(s); window.scrollTo({top:0,behavior:"smooth"}) }
+
+  const addCohort = (name,term)=>{
+    const c = { id:uid(), name:name.trim(), term:term.trim() }
+    setCohorts(prev=>[...prev,c])
+    setSelectedCohorts(prev=>[...prev, c.id])
+    setShowCohortForm(false)
+  }
+  const toggleCohort = (id)=> setSelectedCohorts(prev=> prev.includes(id) ? prev.filter(x=>x!==id) : [...prev,id])
+  const addParticipant = (p)=> setParticipants(prev=>[...prev,{ id:uid(), ...p }])
+  const removeParticipant = (id)=> setParticipants(prev=>prev.filter(p=>p.id!==id))
+
+  // participants limited to the selected cohorts (or all if none selected)
+  const visibleParticipants = selectedCohorts.length
+    ? participants.filter(p=>selectedCohorts.includes(p.cohortId))
+    : participants
+
   return (
     <div>
       <div className="banner">SchoolSims Professional Learning Implementation · Non–Higher Education · Upload a guide to generate a live plan</div>
@@ -39,6 +65,31 @@ export default function App(){
               ))}
             </div>
           ))}
+
+          {/* Cohorts group */}
+          <div className="grp" style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingRight:16}}>
+            <span>Cohorts</span>
+            <button onClick={()=>{setShowCohortForm(v=>!v)}} title="Create cohort"
+              style={{background:"var(--maroon)",color:"#fff",border:"none",borderRadius:6,width:20,height:20,cursor:"pointer",fontSize:14,lineHeight:1,fontWeight:700}}>+</button>
+          </div>
+          {showCohortForm && <CohortForm onAdd={addCohort} onCancel={()=>setShowCohortForm(false)} />}
+          {cohorts.length===0 && !showCohortForm && (
+            <div style={{padding:"4px 22px 8px",color:"#6B7FB0",fontSize:11.5,lineHeight:1.5}}>No cohorts yet. Click + to create one.</div>
+          )}
+          {cohorts.map(c=>(
+            <button key={c.id} onClick={()=>toggleCohort(c.id)}
+              className="link" style={{paddingLeft:22,opacity:selectedCohorts.includes(c.id)?1:0.6}}>
+              <span style={{width:15,height:15,borderRadius:4,border:"1.5px solid #6B7FB0",flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",background:selectedCohorts.includes(c.id)?"var(--maroon)":"transparent",borderColor:selectedCohorts.includes(c.id)?"var(--maroon)":"#6B7FB0"}}>
+                {selectedCohorts.includes(c.id) && <span style={{color:"#fff",fontSize:10,lineHeight:1}}>✓</span>}
+              </span>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
+            </button>
+          ))}
+          {cohorts.length>0 && (
+            <div style={{padding:"6px 22px 4px",color:"#6B7FB0",fontSize:11}}>
+              {selectedCohorts.length} of {cohorts.length} selected · click to toggle
+            </div>
+          )}
         </nav>
         <main className="main">
           {screen==="import" && <Import go={go} setModel={setModel}/>}
@@ -46,8 +97,12 @@ export default function App(){
           {screen==="overview" && <Overview go={go} model={model}/>}
           {screen==="timeline" && <Timeline model={model}/>}
           {screen==="competencies" && <Competencies model={model}/>}
-          {screen==="heatmap" && <HeatMap/>}
-          {screen==="participant" && <Participant go={go}/>}
+          {screen==="heatmap" && <HeatMap participants={visibleParticipants} cohorts={cohorts} model={model}/>}
+          {screen==="participant" && <Participant
+              cohorts={cohorts} participants={visibleParticipants} allParticipants={participants}
+              selectedCohorts={selectedCohorts} activeParticipant={activeParticipant}
+              setActiveParticipant={setActiveParticipant} addParticipant={addParticipant}
+              removeParticipant={removeParticipant} go={go} model={model} />}
           {screen==="narrative" && <Narrative model={model}/>}
         </main>
       </div>
@@ -418,21 +473,52 @@ function Competencies({model}){
   )
 }
 
-/* ---------- HEAT MAP (illustrative) ---------- */
-function HeatMap(){
+/* ---------- COHORT FORM (sidebar) ---------- */
+function CohortForm({onAdd,onCancel}){
+  const [name,setName] = useState("")
+  const [term,setTerm] = useState("")
+  const inp = { width:"100%",padding:"6px 8px",borderRadius:6,border:"1px solid #3A4A7A",background:"#0E1A2E",color:"#fff",fontSize:12,fontFamily:"inherit",marginBottom:6 }
+  return (
+    <div style={{padding:"4px 16px 10px"}}>
+      <input style={inp} placeholder="Cohort name" value={name} onChange={e=>setName(e.target.value)} autoFocus/>
+      <input style={inp} placeholder="Term (e.g. 2026–27)" value={term} onChange={e=>setTerm(e.target.value)}/>
+      <div style={{display:"flex",gap:6}}>
+        <button onClick={()=>name.trim()&&onAdd(name,term)} disabled={!name.trim()}
+          style={{flex:1,background:"var(--maroon)",color:"#fff",border:"none",borderRadius:6,padding:"6px",fontSize:12,fontWeight:700,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"inherit"}}>Create</button>
+        <button onClick={onCancel} style={{background:"transparent",color:"#8A9CC8",border:"1px solid #3A4A7A",borderRadius:6,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- HEAT MAP (data-driven; empty until participants added) ---------- */
+function HeatMap({participants,cohorts,model}){
+  const cats = model ? Object.keys(model.typeCounts) : ["Workshop","Coaching","Project","Assessment","Reflection"]
+  if (!participants.length) {
+    return (
+      <div className="fade">
+        <div className="crumb">Monitor › Cohort Heat Map</div>
+        <h1 className="pg">Cohort Heat Map</h1>
+        <p className="pg-sub">Implementation gaps across participants and categories.</p>
+        <EmptyState icon="🔲"
+          title="No participant data yet"
+          body="The heat map fills in once you add participants to a cohort and activities are published. Add participants on the Participant Detail screen, then return here." />
+      </div>
+    )
+  }
   return (
     <div className="fade">
       <div className="crumb">Monitor › Cohort Heat Map</div>
       <h1 className="pg">Cohort Heat Map</h1>
-      <p className="pg-sub">Implementation gaps across participants and categories. Colors carry accessible text labels. Populates once participants are assigned and evidence is tracked.</p>
+      <p className="pg-sub">Rows are your participants; columns are activity categories. Status fills in as evidence is tracked.</p>
       <div className="card heat">
         <table>
-          <thead><tr><th className="rowh">Participant</th>{SAMPLE.heatCats.map(c=><th key={c}>{c}</th>)}</tr></thead>
+          <thead><tr><th className="rowh">Participant</th>{cats.map(c=><th key={c}>{c}</th>)}</tr></thead>
           <tbody>
-            {SAMPLE.heatParts.map((p,pi)=>(
-              <tr key={p}>
-                <td className="cell-name">{p}</td>
-                {SAMPLE.heatCats.map((c,ci)=>{const s=SAMPLE.heatStatuses[(pi*2+ci*3+pi)%5];return <td key={c}><span className="cell" style={{background:s[0]}} title={`${c}: ${s[1]}`}>{s[1]}</span></td>})}
+            {participants.map(p=>(
+              <tr key={p.id}>
+                <td className="cell-name">{p.name}</td>
+                {cats.map(c=><td key={c}><span className="cell" style={{background:"#C3CAD9"}} title={`${c}: Not Started`}>NS</span></td>)}
               </tr>
             ))}
           </tbody>
@@ -444,48 +530,168 @@ function HeatMap(){
           <span><span className="sw" style={{background:"var(--maroon)"}}/> Overdue</span>
           <span><span className="sw" style={{background:"#C3CAD9"}}/> Not Started</span>
         </div>
-        <div className="src" style={{marginTop:8}}>Illustrative sample — live cells render from published assignments.</div>
+        <div className="src" style={{marginTop:8}}>All participants start at “Not Started.” Status updates as evidence is submitted and approved.</div>
       </div>
     </div>
   )
 }
 
-/* ---------- PARTICIPANT (illustrative) ---------- */
-function Participant({go}){
-  const p=SAMPLE.participant
+function EmptyState({icon,title,body,children}){
+  return (
+    <div className="card" style={{textAlign:"center",padding:"48px 24px"}}>
+      <div style={{fontSize:40,marginBottom:12}}>{icon}</div>
+      <div style={{fontWeight:800,color:"var(--navy)",fontSize:17,marginBottom:8}}>{title}</div>
+      <div style={{color:"var(--muted)",fontSize:13.5,lineHeight:1.6,maxWidth:460,margin:"0 auto 16px"}}>{body}</div>
+      {children}
+    </div>
+  )
+}
+
+/* ---------- PARTICIPANT DETAIL (manage real participants) ---------- */
+function Participant({cohorts,participants,selectedCohorts,activeParticipant,setActiveParticipant,addParticipant,removeParticipant,go,model}){
+  const [showForm,setShowForm] = useState(false)
+  const active = participants.find(p=>p.id===activeParticipant) || null
+
+  // No cohorts at all
+  if (cohorts.length===0) {
+    return (
+      <div className="fade">
+        <div className="crumb">Drill Down › Participant Detail</div>
+        <h1 className="pg">Participants</h1>
+        <p className="pg-sub">Add participants to a cohort to track their progress.</p>
+        <EmptyState icon="👥"
+          title="Create a cohort first"
+          body="Participants belong to a cohort. Use the “+ ” next to Cohorts in the left sidebar to create one, then come back to add participants." />
+      </div>
+    )
+  }
+
+  // Detail view for one participant
+  if (active) {
+    const cohort = cohorts.find(c=>c.id===active.cohortId)
+    return (
+      <div className="fade">
+        <div className="crumb"><button className="lnk" onClick={()=>setActiveParticipant(null)}>Participants</button> › {active.name}</div>
+        <h1 className="pg">{active.name}</h1>
+        <p className="pg-sub">{[active.role,active.school,cohort&&cohort.name].filter(Boolean).join(" · ")} · <span className="st st-notstarted">Not Started</span></p>
+        <div className="tiles">
+          <div className="tile"><div className="v" style={{color:"var(--navy)"}}>0%</div><div className="l">Overall Completion</div></div>
+          <div className="tile" style={{borderLeftColor:"var(--maroon)"}}><div className="v" style={{color:"var(--maroon)"}}>0</div><div className="l">Overdue Items</div></div>
+          <div className="tile" style={{borderLeftColor:"var(--gold)"}}><div className="v" style={{color:"var(--gold)"}}>0</div><div className="l">Awaiting Approval</div></div>
+          <div className="tile" style={{borderLeftColor:"var(--green)"}}><div className="v" style={{color:"var(--green)"}}>0</div><div className="l">Completed</div></div>
+        </div>
+        <div className="two">
+          <div className="card">
+            <h3>Assigned Activities &amp; Evidence Lifecycle</h3>
+            {model && model.months.length>0 ? (
+              <table className="grid">
+                <thead><tr><th>Activity</th><th>Status</th></tr></thead>
+                <tbody>
+                  {model.months.flatMap(([,tasks])=>tasks).slice(0,12).map((t,i)=>{
+                    const idx=t.lastIndexOf("·"); const n=idx>=0?t.slice(0,idx):t
+                    return <tr key={i}><td>{n}</td><td><span className="st st-notstarted">Not Started</span></td></tr>
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <div className="src">Publish a plan (Plan Import → AI Task Review) to assign activities to this participant.</div>
+            )}
+            <div className="src" style={{marginTop:10}}>All activities start at “Not Started.” Submission ≠ completion; approval-required items wait in the reviewer queue.</div>
+          </div>
+          <div>
+            <div className="card">
+              <h3>Contact</h3>
+              <table className="grid"><tbody>
+                <tr><td style={{color:"var(--muted)",width:90}}>Role</td><td>{active.role||"—"}</td></tr>
+                <tr><td style={{color:"var(--muted)"}}>School</td><td>{active.school||"—"}</td></tr>
+                <tr><td style={{color:"var(--muted)"}}>Email</td><td>{active.email||"—"}</td></tr>
+                <tr><td style={{color:"var(--muted)"}}>Cohort</td><td>{cohort?cohort.name:"—"}</td></tr>
+              </tbody></table>
+            </div>
+            <div className="card">
+              <h3>Competency Progress</h3>
+              {(model?model.compCards:SAMPLE.competencies).map(([name],i)=>(
+                <div className="prow2" key={name}><div className="top"><span>{name}</span><span className="pct">0%</span></div><div className="bar"><div style={{width:"0%",background:pickBAR[i%6]}}/></div></div>
+              ))}
+              <div className="src" style={{marginTop:6}}>Fills in as evidence is approved.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Roster list + add form
   return (
     <div className="fade">
-      <div className="crumb"><button className="lnk" onClick={()=>go("overview")}>Cohort Overview</button> › Participant Detail</div>
-      <h1 className="pg">{p.name}</h1>
-      <p className="pg-sub">{p.role} · <span className="st st-progress">On Track</span> · <span className="src">illustrative sample participant</span></p>
-      <div className="tiles">
-        <div className="tile"><div className="v" style={{color:"var(--navy)"}}>{p.completion}%</div><div className="l">Overall Completion</div></div>
-        <div className="tile" style={{borderLeftColor:"var(--maroon)"}}><div className="v" style={{color:"var(--maroon)"}}>{p.overdue}</div><div className="l">Overdue Items</div></div>
-        <div className="tile" style={{borderLeftColor:"var(--gold)"}}><div className="v" style={{color:"var(--gold)"}}>{p.awaiting}</div><div className="l">Awaiting Approval</div></div>
-        <div className="tile" style={{borderLeftColor:"var(--green)"}}><div className="v" style={{color:"var(--green)"}}>{p.completed}</div><div className="l">Completed</div></div>
+      <div className="crumb">Drill Down › Participant Detail</div>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:10}}>
+        <h1 className="pg" style={{marginBottom:0}}>Participants</h1>
+        <button className="btn btn-primary" onClick={()=>setShowForm(v=>!v)}>+ Add Participant</button>
       </div>
-      <div className="two">
+      <p className="pg-sub" style={{marginTop:6}}>
+        {selectedCohorts.length
+          ? `Showing participants in ${selectedCohorts.length} selected cohort${selectedCohorts.length>1?"s":""}.`
+          : "Showing all participants. Select cohorts in the sidebar to filter."}
+      </p>
+
+      {showForm && <AddParticipantForm cohorts={cohorts} onAdd={(p)=>{addParticipant(p); setShowForm(false)}} onCancel={()=>setShowForm(false)} />}
+
+      {participants.length===0 ? (
+        <EmptyState icon="👤"
+          title="No participants yet"
+          body="Click “Add Participant” to build your roster. Each participant is assigned to a cohort and will be tracked against the published plan." />
+      ) : (
         <div className="card">
-          <h3>Assigned Activities &amp; Evidence Lifecycle</h3>
           <table className="grid">
-            <thead><tr><th>Activity</th><th>Category</th><th>Evidence</th><th>Status</th></tr></thead>
-            <tbody>{p.activities.map((a,i)=>(<tr key={i}><td>{a[0]}</td><td>{a[1]}</td><td>{a[2]}</td><td><span className={"st "+a[3]}>{a[4]}</span></td></tr>))}</tbody>
+            <thead><tr><th>Name</th><th>Role</th><th>School</th><th>Cohort</th><th>Email</th><th></th></tr></thead>
+            <tbody>
+              {participants.map(p=>{
+                const c = cohorts.find(x=>x.id===p.cohortId)
+                return (
+                  <tr key={p.id}>
+                    <td><button className="lnk" onClick={()=>setActiveParticipant(p.id)}>{p.name}</button></td>
+                    <td>{p.role||"—"}</td><td>{p.school||"—"}</td>
+                    <td>{c?c.name:"—"}</td><td>{p.email||"—"}</td>
+                    <td style={{textAlign:"right"}}><button className="btn btn-ghost btn-sm" onClick={()=>removeParticipant(p.id)}>Remove</button></td>
+                  </tr>
+                )
+              })}
+            </tbody>
           </table>
-          <div className="src" style={{marginTop:10}}>Submission ≠ completion. Items needing approval sit in the reviewer's queue until signed off.</div>
         </div>
-        <div>
-          <div className="card">
-            <h3>Competency Progress</h3>
-            {SAMPLE.competencies.map(([name,pct],i)=>{const v=Math.min(pct+40,95);return(
-              <div className="prow2" key={name}><div className="top"><span>{name}</span><span className="pct">{v}%</span></div><div className="bar"><div style={{width:v+"%",background:pickBAR[i%6]}}/></div></div>
-            )})}
-          </div>
-          <div className="card" style={{background:"var(--ai-l)",borderColor:"#D9C19A"}}>
-            <h3 style={{color:"var(--ai)"}}>Recommended SchoolSims Practice</h3>
-            <div style={{fontSize:13,lineHeight:1.7}}>› <b>Budget Crisis Response</b> — supports Manage Operations<br/>› <b>Observation &amp; Feedback</b> — supports Develop People</div>
-            <div className="src" style={{marginTop:8}}>Optional · admin approves before assignment.</div>
-          </div>
+      )}
+    </div>
+  )
+}
+
+function AddParticipantForm({cohorts,onAdd,onCancel}){
+  const [name,setName]=useState(""), [role,setRole]=useState(""), [school,setSchool]=useState(""), [email,setEmail]=useState("")
+  const [cohortId,setCohortId]=useState(cohorts[0]?cohorts[0].id:"")
+  const f = { padding:"9px 11px",borderRadius:8,border:"1px solid var(--border)",fontSize:13.5,fontFamily:"inherit",width:"100%" }
+  const can = name.trim() && cohortId
+  return (
+    <div className="card">
+      <h3>Add Participant</h3>
+      <div className="row" style={{marginBottom:12}}>
+        <div style={{flex:1,minWidth:200}}><label style={{fontSize:12,fontWeight:700,color:"var(--navy)"}}>Name *</label><input style={f} value={name} onChange={e=>setName(e.target.value)} placeholder="Full name" autoFocus/></div>
+        <div style={{flex:1,minWidth:200}}><label style={{fontSize:12,fontWeight:700,color:"var(--navy)"}}>Role / Title</label><input style={f} value={role} onChange={e=>setRole(e.target.value)} placeholder="e.g. Assistant Principal"/></div>
+      </div>
+      <div className="row" style={{marginBottom:12}}>
+        <div style={{flex:1,minWidth:200}}><label style={{fontSize:12,fontWeight:700,color:"var(--navy)"}}>School / Site</label><input style={f} value={school} onChange={e=>setSchool(e.target.value)} placeholder="Building or location"/></div>
+        <div style={{flex:1,minWidth:200}}><label style={{fontSize:12,fontWeight:700,color:"var(--navy)"}}>Email</label><input style={f} value={email} onChange={e=>setEmail(e.target.value)} placeholder="name@district.org"/></div>
+      </div>
+      <div className="row" style={{marginBottom:14,alignItems:"flex-end"}}>
+        <div style={{flex:1,minWidth:200}}>
+          <label style={{fontSize:12,fontWeight:700,color:"var(--navy)"}}>Cohort *</label>
+          <select style={f} value={cohortId} onChange={e=>setCohortId(e.target.value)}>
+            {cohorts.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
         </div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <button className="btn btn-primary" disabled={!can} onClick={()=>can&&onAdd({name:name.trim(),role:role.trim(),school:school.trim(),email:email.trim(),cohortId})}>Add Participant</button>
+        <button className="btn btn-ghost" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   )

@@ -5,7 +5,7 @@
 // The Anthropic API key is read from the server-side env var ANTHROPIC_API_KEY and
 // is NEVER exposed to the browser.
 
-const MODEL = "claude-sonnet-4-6";
+const MODEL = "claude-opus-4-20250514"; // adjust to a model id enabled on your account
 
 // Anonymized best-practice reference (distilled from top district programs).
 // Kept inline so this serverless file has no imports. Never name a real district.
@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 8192,
+        max_tokens: 4096,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: `Extract and enrich the implementation plan from this document:\n\n${docText}` }],
       }),
@@ -92,19 +92,13 @@ export default async function handler(req, res) {
       return;
     }
 
-        const data = await r.json();
+    const data = await r.json();
     const raw = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
-    let clean = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
-    // If the model wrapped JSON in prose, grab the outermost { ... }.
-    const first = clean.indexOf("{");
-    const last = clean.lastIndexOf("}");
-    if (first > 0 || last < clean.length - 1) {
-      if (first !== -1 && last !== -1 && last > first) clean = clean.slice(first, last + 1);
-    }
+    const clean = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
 
     let parsed;
     try { parsed = JSON.parse(clean); }
-    catch { res.status(502).json({ error: "Model did not return valid JSON.", raw: clean.slice(0, 1200) }); return; }
+    catch { res.status(502).json({ error: "Model did not return valid JSON.", raw: clean.slice(0, 800) }); return; }
 
     res.status(200).json({ ok: true, result: parsed });
   } catch (e) {
