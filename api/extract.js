@@ -80,7 +80,7 @@ export default async function handler(req, res) {
       headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 4096,
+        max_tokens: 8192,
         system: SYSTEM_PROMPT,
         messages: [{ role: "user", content: `Extract and enrich the implementation plan from this document:\n\n${docText}` }],
       }),
@@ -92,13 +92,19 @@ export default async function handler(req, res) {
       return;
     }
 
-    const data = await r.json();
+        const data = await r.json();
     const raw = (data.content || []).filter(b => b.type === "text").map(b => b.text).join("").trim();
-    const clean = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    let clean = raw.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
+    // If the model wrapped JSON in prose, grab the outermost { ... }.
+    const first = clean.indexOf("{");
+    const last = clean.lastIndexOf("}");
+    if (first > 0 || last < clean.length - 1) {
+      if (first !== -1 && last !== -1 && last > first) clean = clean.slice(first, last + 1);
+    }
 
     let parsed;
     try { parsed = JSON.parse(clean); }
-    catch { res.status(502).json({ error: "Model did not return valid JSON.", raw: clean.slice(0, 800) }); return; }
+    catch { res.status(502).json({ error: "Model did not return valid JSON.", raw: clean.slice(0, 1200) }); return; }
 
     res.status(200).json({ ok: true, result: parsed });
   } catch (e) {
