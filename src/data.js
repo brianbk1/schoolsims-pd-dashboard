@@ -1,5 +1,5 @@
 // Generalized sample data — no hard-coded district terminology (dev rule).
-export const BAR = ["#8B1A2E","#1E2D6B","#2E6DB4","#5A3472","#2E6B50","#8B5A1A"];
+export const BAR = ["#6D5AE6","#3B6FD4","#2E8B6A","#B07A1A","#5A3472","#8B1A2E"];
 export const MONTH_COLORS = ["#8B1A2E","#1E2D6B","#9E2235","#253580","#7A1728","#172560","#8B1A2E","#1E2D6B","#9E2235","#253580"];
 
 export const COMP_COLORS = {

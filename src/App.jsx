@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import * as SAMPLE from './data.js'
 import { extractText } from './parse.js'
 import { normalize } from './normalize.js'
+import HigherEd from './HigherEd.jsx'
 
 const NAV = [
   { grp:"Set Up", items:[["import","📥","Plan Import"],["review","🧠","AI Task Review"]] },
@@ -13,6 +14,7 @@ let _id = 1
 const uid = () => "id" + (_id++)
 
 export default function App(){
+  const [mode,setMode] = useState("pd")     // "pd" (PD Guide) | "he" (Higher Ed) — DEMO TOGGLE ONLY
   const [screen,setScreen] = useState("import")
   const [model,setModel] = useState(null)   // normalized extraction result, or null = use sample
   // In-session cohort + participant state (clears on refresh).
@@ -41,18 +43,24 @@ export default function App(){
 
   return (
     <div>
-      <div className="banner">SchoolSims Professional Learning Implementation · Non–Higher Education · Upload a guide to generate a live plan</div>
+      <div className="demo-note">⚠ Example toggle below — for demonstration only. The PD Guide / Higher Ed switch will not appear in the final product.</div>
       <div className="nav">
         <div className="nav-left">
           <div className="logo">S</div>
           <span className="nav-title">SchoolSims</span>
-          <span className="nav-sub">/ Professional Learning Implementation</span>
+          <span className="nav-sub">/ {mode==="he" ? "Cohort Analytics" : "Professional Learning Implementation"}</span>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <span className="pill pill-navy">Program Workspace</span>
-          <span className="pill pill-maroon">{model ? "Live Extraction" : "Sample Data"}</span>
+        <div className="toggle-wrap">
+          <button className={mode==="pd"?"on":""} onClick={()=>setMode("pd")}>📥 PD Guide</button>
+          <button className={mode==="he"?"on":""} onClick={()=>setMode("he")}>🎓 Higher Ed Cohort</button>
         </div>
       </div>
+
+      {mode==="he" ? (
+        <div className="shell">
+          <main className="main" style={{maxWidth:1200}}><HigherEd/></main>
+        </div>
+      ) : (
       <div className="shell">
         <nav className="side">
           {NAV.map(g=>(
@@ -70,7 +78,7 @@ export default function App(){
           <div className="grp" style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingRight:16}}>
             <span>Cohorts</span>
             <button onClick={()=>{setShowCohortForm(v=>!v)}} title="Create cohort"
-              style={{background:"var(--maroon)",color:"#fff",border:"none",borderRadius:6,width:20,height:20,cursor:"pointer",fontSize:14,lineHeight:1,fontWeight:700}}>+</button>
+              style={{background:"var(--purple)",color:"#fff",border:"none",borderRadius:6,width:20,height:20,cursor:"pointer",fontSize:14,lineHeight:1,fontWeight:700}}>+</button>
           </div>
           {showCohortForm && <CohortForm onAdd={addCohort} onCancel={()=>setShowCohortForm(false)} />}
           {cohorts.length===0 && !showCohortForm && (
@@ -79,7 +87,7 @@ export default function App(){
           {cohorts.map(c=>(
             <button key={c.id} onClick={()=>toggleCohort(c.id)}
               className="link" style={{paddingLeft:22,opacity:selectedCohorts.includes(c.id)?1:0.6}}>
-              <span style={{width:15,height:15,borderRadius:4,border:"1.5px solid #6B7FB0",flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",background:selectedCohorts.includes(c.id)?"var(--maroon)":"transparent",borderColor:selectedCohorts.includes(c.id)?"var(--maroon)":"#6B7FB0"}}>
+              <span style={{width:15,height:15,borderRadius:4,border:"1.5px solid #6B7FB0",flexShrink:0,display:"inline-flex",alignItems:"center",justifyContent:"center",background:selectedCohorts.includes(c.id)?"var(--purple)":"transparent",borderColor:selectedCohorts.includes(c.id)?"var(--purple)":"#6B7FB0"}}>
                 {selectedCohorts.includes(c.id) && <span style={{color:"#fff",fontSize:10,lineHeight:1}}>✓</span>}
               </span>
               <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{c.name}</span>
@@ -106,6 +114,7 @@ export default function App(){
           {screen==="narrative" && <Narrative model={model}/>}
         </main>
       </div>
+      )}
     </div>
   )
 }
@@ -356,7 +365,7 @@ function Overview({go,model}){
       <p className="pg-sub">{prog.account} · {prog.term} · <span className="st st-progress">{prog.status}</span></p>
       <div className="tiles">
         <div className="tile"><div className="v" style={{color:"var(--navy)"}}>{prog.participants}</div><div className="l">Participants</div></div>
-        <div className="tile" style={{borderLeftColor:"var(--maroon)"}}><div className="v" style={{color:"var(--maroon)"}}>{prog.activities}</div><div className="l">{model?"Proposed":"Published"} Activities</div></div>
+        <div className="tile" style={{borderLeftColor:"var(--purple)"}}><div className="v" style={{color:"var(--purple)"}}>{prog.activities}</div><div className="l">{model?"Proposed":"Published"} Activities</div></div>
         <div className="tile" style={{borderLeftColor:"var(--blue)"}}><div className="v" style={{color:"var(--blue)"}}>{prog.competenciesCount}</div><div className="l">Competencies</div></div>
         <div className="tile" style={{borderLeftColor:"var(--green)"}}><div className="v" style={{color:"var(--green)"}}>{prog.overallCompletion}%</div><div className="l">Overall Completion</div></div>
       </div>
@@ -484,7 +493,7 @@ function CohortForm({onAdd,onCancel}){
       <input style={inp} placeholder="Term (e.g. 2026–27)" value={term} onChange={e=>setTerm(e.target.value)}/>
       <div style={{display:"flex",gap:6}}>
         <button onClick={()=>name.trim()&&onAdd(name,term)} disabled={!name.trim()}
-          style={{flex:1,background:"var(--maroon)",color:"#fff",border:"none",borderRadius:6,padding:"6px",fontSize:12,fontWeight:700,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"inherit"}}>Create</button>
+          style={{flex:1,background:"var(--purple)",color:"#fff",border:"none",borderRadius:6,padding:"6px",fontSize:12,fontWeight:700,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"inherit"}}>Create</button>
         <button onClick={onCancel} style={{background:"transparent",color:"#8A9CC8",border:"1px solid #3A4A7A",borderRadius:6,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
       </div>
     </div>
@@ -713,7 +722,7 @@ function Narrative({model}){
           <div style={{width:40,height:40,background:"var(--navy)",borderRadius:9,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontWeight:800}}>AI</div>
           <div><div style={{fontWeight:800,color:"var(--navy)"}}>AI Executive Narrative</div><div className="src">{model?"Generated from uploaded document":"Data as of reporting date"} · grounded in available information only</div></div>
         </div>
-        <div style={{background:"var(--bg)",borderLeft:"4px solid var(--maroon)",borderRadius:9,padding:20,lineHeight:1.85,fontSize:14.5}}>{narrative}</div>
+        <div style={{background:"var(--bg)",borderLeft:"4px solid var(--purple)",borderRadius:9,padding:20,lineHeight:1.85,fontSize:14.5}}>{narrative}</div>
       </div>
       <div className="two">
         <div className="card" style={{background:"var(--maroon-l)",borderColor:"#E0B9C2"}}>
