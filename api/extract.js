@@ -5,7 +5,7 @@
 // The Anthropic API key is read from the server-side env var ANTHROPIC_API_KEY and
 // is NEVER exposed to the browser.
 
-const MODEL = "claude-sonnet-4-20250514"; // adjust to a model id enabled on your account
+const MODEL = "claude-sonnet-4-6";
 
 // Anonymized best-practice reference (distilled from top district programs).
 // Kept inline so this serverless file has no imports. Never name a real district.
