@@ -117,3 +117,20 @@ export const sampleSuggestions = [
   { title:"Improvement Project — Mid-Point Review", deets:"Category: Project · Month: January · Evidence: Artifact", rationale:"A mid-year checkpoint keeps multi-month projects on track." },
   { title:"End-of-Year Reflection & Next-Year Planning", deets:"Category: Reflection · Month: May · Evidence: Reflection", rationale:"Closing reflection plus forward planning sustains growth into the next cycle." },
 ];
+
+// ---- Sample cohorts & participants (example data; obvious placeholder names) ----
+// Pre-loaded so the Cohort Manager, Participants, and Heat Map screens have data to show.
+export const sampleCohorts = [
+  { id:"coh_alp",  name:"Aspiring Leaders · Cohort A", term:"2026–27" },
+  { id:"coh_ind",  name:"New Principal Induction",     term:"2026–27" },
+];
+export const sampleParticipants = [
+  { id:"pt_1", cohortId:"coh_alp", name:"Dana Alvarez",   role:"Assistant Principal", school:"Lincoln Middle School",   email:"dalvarez@sampledistrict.org" },
+  { id:"pt_2", cohortId:"coh_alp", name:"Marcus Webb",    role:"Teacher Leader",      school:"Central High School",     email:"mwebb@sampledistrict.org" },
+  { id:"pt_3", cohortId:"coh_alp", name:"Priya Shah",     role:"Dean of Students",    school:"Oak Elementary",          email:"pshah@sampledistrict.org" },
+  { id:"pt_4", cohortId:"coh_alp", name:"Trevor Ellis",   role:"AP Intern",           school:"Riverside High School",   email:"tellis@sampledistrict.org" },
+  { id:"pt_5", cohortId:"coh_alp", name:"Sofia Mendes",   role:"Instructional Coach", school:"Lincoln Middle School",   email:"smendes@sampledistrict.org" },
+  { id:"pt_6", cohortId:"coh_ind", name:"Jordan Park",    role:"Principal (Yr 1)",    school:"Maple Grove Elementary",  email:"jpark@sampledistrict.org" },
+  { id:"pt_7", cohortId:"coh_ind", name:"Alicia Barnes",  role:"Principal (Yr 1)",    school:"Eastside Middle School",  email:"abarnes@sampledistrict.org" },
+  { id:"pt_8", cohortId:"coh_ind", name:"Devon Carter",   role:"Principal (Yr 1)",    school:"Westview High School",    email:"dcarter@sampledistrict.org" },
+];

@@ -6,7 +6,7 @@ import HigherEd from './HigherEd.jsx'
 
 const NAV = [
   { grp:"Set Up", items:[["import","📥","Plan Import"],["review","🧠","AI Task Review"]] },
-  { grp:"Monitor", items:[["overview","📊","Cohort Overview"],["timeline","📅","Task Timeline"],["competencies","🎯","Competencies"],["heatmap","🔲","Cohort Heat Map"]] },
+  { grp:"Monitor", items:[["overview","📊","Cohort Overview"],["cohortmgr","🗂️","Cohort Manager"],["timeline","📅","Task Timeline"],["competencies","🎯","Competencies"],["heatmap","🔲","Cohort Heat Map"]] },
   { grp:"Drill Down", items:[["participant","👤","Participants"],["narrative","🤖","AI Narrative"]] },
 ]
 
@@ -17,10 +17,10 @@ export default function App(){
   const [mode,setMode] = useState("pd")     // "pd" (PD Guide) | "he" (Higher Ed) — DEMO TOGGLE ONLY
   const [screen,setScreen] = useState("import")
   const [model,setModel] = useState(null)   // normalized extraction result, or null = use sample
-  // In-session cohort + participant state (clears on refresh).
-  const [cohorts,setCohorts] = useState([])            // [{id,name,term}]
-  const [participants,setParticipants] = useState([])  // [{id,cohortId,name,role,school,email}]
-  const [selectedCohorts,setSelectedCohorts] = useState([]) // array of cohort ids (multi-select filter)
+  // In-session cohort + participant state. Pre-seeded with sample data for the example dashboard.
+  const [cohorts,setCohorts] = useState(SAMPLE.sampleCohorts)            // [{id,name,term}]
+  const [participants,setParticipants] = useState(SAMPLE.sampleParticipants)  // [{id,cohortId,name,role,school,email}]
+  const [selectedCohorts,setSelectedCohorts] = useState(SAMPLE.sampleCohorts.map(c=>c.id)) // multi-select filter (all on by default)
   const [activeParticipant,setActiveParticipant] = useState(null) // id
   const [showCohortForm,setShowCohortForm] = useState(false)
 
@@ -103,6 +103,9 @@ export default function App(){
           {screen==="import" && <Import go={go} setModel={setModel}/>}
           {screen==="review" && <Review go={go} model={model}/>}
           {screen==="overview" && <Overview go={go} model={model}/>}
+          {screen==="cohortmgr" && <CohortManager
+              cohorts={cohorts} participants={visibleParticipants}
+              selectedCohorts={selectedCohorts} model={model} go={go}/>}
           {screen==="timeline" && <Timeline model={model}/>}
           {screen==="competencies" && <Competencies model={model}/>}
           {screen==="heatmap" && <HeatMap participants={visibleParticipants} cohorts={cohorts} model={model}/>}
@@ -495,6 +498,175 @@ function CohortForm({onAdd,onCancel}){
         <button onClick={()=>name.trim()&&onAdd(name,term)} disabled={!name.trim()}
           style={{flex:1,background:"var(--purple)",color:"#fff",border:"none",borderRadius:6,padding:"6px",fontSize:12,fontWeight:700,cursor:name.trim()?"pointer":"not-allowed",fontFamily:"inherit"}}>Create</button>
         <button onClick={onCancel} style={{background:"transparent",color:"#8A9CC8",border:"1px solid #3A4A7A",borderRadius:6,padding:"6px 10px",fontSize:12,cursor:"pointer",fontFamily:"inherit"}}>Cancel</button>
+      </div>
+    </div>
+  )
+}
+
+/* ---------- COHORT MANAGER (multi-select roster + bulk update plan items) ---------- */
+const STATUS_ORDER = ["notstarted","progress","submitted","complete","overdue"]
+const STATUS_META = {
+  notstarted:{label:"Not Started",cls:"st-notstarted"},
+  progress:{label:"In Progress",cls:"st-progress"},
+  submitted:{label:"Submitted",cls:"st-submitted"},
+  complete:{label:"Complete",cls:"st-complete"},
+  overdue:{label:"Overdue",cls:"st-overdue"},
+}
+
+// Pull a flat list of plan activities from the extracted model, or fall back to sample months.
+function planItems(model){
+  const src = model && model.months && model.months.length ? model.months : SAMPLE.months
+  const items = []
+  src.forEach(([month,tasks])=> tasks.forEach(t=>{
+    const idx=t.lastIndexOf("·")
+    const name=idx>=0?t.slice(0,idx).trim():t.trim()
+    const cat=idx>=0?t.slice(idx+1).trim():"Activity"
+    items.push({ id:`${month}-${name}`.replace(/\s+/g,"_"), name, cat, month })
+  }))
+  // de-dupe by name, keep first
+  const seen=new Set()
+  return items.filter(it=> seen.has(it.name)?false:(seen.add(it.name),true)).slice(0,10)
+}
+
+function CohortManager({cohorts,participants,selectedCohorts,model,go}){
+  const items = planItems(model)
+  const [activeItem,setActiveItem] = useState(items[0]?items[0].id:null)
+  const [selected,setSelected] = useState([])          // participant ids
+  const [grid,setGrid] = useState({})                  // { `${pid}|${itemId}`: statusKey }
+  const [toast,setToast] = useState("")
+
+  if (cohorts.length===0 || !participants.length){
+    return (
+      <div className="fade">
+        <div className="crumb">Monitor › Cohort Manager</div>
+        <h1 className="pg">Cohort Manager</h1>
+        <p className="pg-sub">Select participants and update their plan items in bulk.</p>
+        <EmptyState icon="🗂️"
+          title={cohorts.length===0?"Create a cohort first":"No participants yet"}
+          body={cohorts.length===0
+            ? "Use the “+” next to Cohorts in the left sidebar to create one, then add participants."
+            : "Add participants on the Participants screen, then come back to manage them here."}>
+          <button className="btn btn-primary btn-sm" onClick={()=>go("participant")}>Go to Participants →</button>
+        </EmptyState>
+      </div>
+    )
+  }
+
+  const item = items.find(i=>i.id===activeItem) || items[0]
+  const statusOf = (pid)=> grid[`${pid}|${activeItem}`] || "notstarted"
+  const allSelected = participants.length>0 && selected.length===participants.length
+  const toggleOne = (pid)=> setSelected(prev=> prev.includes(pid)?prev.filter(x=>x!==pid):[...prev,pid])
+  const toggleAll = ()=> setSelected(allSelected?[]:participants.map(p=>p.id))
+
+  function flash(msg){ setToast(msg); setTimeout(()=>setToast(""),2600) }
+
+  function applyStatus(statusKey, verb){
+    if(!selected.length) return
+    setGrid(prev=>{
+      const next={...prev}
+      selected.forEach(pid=>{ next[`${pid}|${activeItem}`]=statusKey })
+      return next
+    })
+    flash(`${verb} “${item.name}” for ${selected.length} participant${selected.length>1?"s":""}.`)
+  }
+
+  // counts for the active item across visible participants
+  const counts = participants.reduce((a,p)=>{ const s=statusOf(p.id); a[s]=(a[s]||0)+1; return a },{})
+  const pct = Math.round(((counts.complete||0)/participants.length)*100)
+
+  return (
+    <div className="fade">
+      <div className="crumb">Monitor › Cohort Manager</div>
+      <h1 className="pg">Cohort Manager</h1>
+      <p className="pg-sub">
+        {selectedCohorts.length
+          ? `Showing ${participants.length} participant${participants.length>1?"s":""} in ${selectedCohorts.length} selected cohort${selectedCohorts.length>1?"s":""}.`
+          : `Showing all ${participants.length} participants. Select cohorts in the sidebar to filter.`}
+        {" "}Pick a plan item, select people, then apply an update to everyone at once.
+      </p>
+
+      {!model && <div className="note">Showing sample plan items. Upload a PD plan (Plan Import) and publish it to manage your real activities here.</div>}
+
+      {/* item picker */}
+      <div className="card" style={{paddingBottom:16}}>
+        <h3>Plan Item <span className="sub">from the uploaded plan — choose which activity you're updating</span></h3>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {items.map(it=>(
+            <button key={it.id} onClick={()=>setActiveItem(it.id)}
+              className={"btn btn-sm "+(it.id===activeItem?"btn-primary":"btn-ghost")}>
+              {it.name}
+            </button>
+          ))}
+        </div>
+        <div style={{display:"flex",gap:18,marginTop:14,flexWrap:"wrap",alignItems:"center"}}>
+          <span className="tag" style={{background:"var(--purple-l)",color:"var(--purple-d)",border:"1px solid #D9D3F6"}}>{item.cat}</span>
+          <span className="src">Target month: {item.month}</span>
+          <span className="src">· {pct}% complete across this cohort ({counts.complete||0}/{participants.length})</span>
+        </div>
+      </div>
+
+      {/* bulk action bar */}
+      <div className="card" style={{position:"sticky",top:66,zIndex:50,display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",
+           background: selected.length?"var(--purple-l)":"var(--panel)", borderColor: selected.length?"#D9D3F6":"var(--border)"}}>
+        <span style={{fontWeight:700,color:"var(--navy)",fontSize:13.5}}>
+          {selected.length?`${selected.length} selected`:"Select participants to enable bulk actions"}
+        </span>
+        <div style={{flex:1}}/>
+        <button className="btn btn-sm btn-primary" disabled={!selected.length} onClick={()=>applyStatus("complete","Marked complete:")}>✓ Mark Complete</button>
+        <button className="btn btn-sm btn-ghost" disabled={!selected.length} onClick={()=>applyStatus("complete","Approved evidence for:")}>Approve Evidence</button>
+        <button className="btn btn-sm btn-ghost" disabled={!selected.length} onClick={()=>applyStatus("progress","Marked in progress:")}>Mark In Progress</button>
+        <button className="btn btn-sm btn-ghost" disabled={!selected.length} onClick={()=>applyStatus("overdue","Flagged overdue:")}>Set Overdue</button>
+        <button className="btn btn-sm btn-ghost" disabled={!selected.length} onClick={()=>{ flash(`Reminder emails queued for ${selected.length} participant${selected.length>1?"s":""}.`) }}>✉ Send Reminder</button>
+        <button className="btn btn-sm btn-ghost" disabled={!selected.length} onClick={()=>applyStatus("notstarted","Reset:")}>Reset</button>
+      </div>
+
+      {toast && (
+        <div className="card" style={{background:"var(--green-l)",borderColor:"#B6D8C6",color:"var(--green)",fontWeight:700,fontSize:13.5,padding:"12px 16px"}}>
+          ✓ {toast} <span className="src" style={{fontWeight:400}}>(Illustrative — updates this example dashboard; in production this writes to the shared assignment record.)</span>
+        </div>
+      )}
+
+      {/* roster grid */}
+      <div className="card">
+        <table className="grid">
+          <thead>
+            <tr>
+              <th style={{width:34}}>
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all"/>
+              </th>
+              <th>Participant</th><th>Role</th><th>School / Site</th><th>Cohort</th>
+              <th>Status · {item.name}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {participants.map(p=>{
+              const c = cohorts.find(x=>x.id===p.cohortId)
+              const s = statusOf(p.id)
+              const m = STATUS_META[s]
+              const checked = selected.includes(p.id)
+              return (
+                <tr key={p.id} style={checked?{background:"var(--purple-l)"}:undefined}>
+                  <td><input type="checkbox" checked={checked} onChange={()=>toggleOne(p.id)} aria-label={`Select ${p.name}`}/></td>
+                  <td style={{fontWeight:600,color:"var(--navy)"}}>{p.name}<div className="src">{p.email||"—"}</div></td>
+                  <td>{p.role||"—"}</td>
+                  <td>{p.school||"—"}</td>
+                  <td>{c?c.name:"—"}</td>
+                  <td>
+                    <span className={"st "+m.cls}>{m.label}</span>
+                    <select value={s} onChange={e=>setGrid(prev=>({...prev,[`${p.id}|${activeItem}`]:e.target.value}))}
+                      style={{marginLeft:8,fontSize:11,border:"1px solid var(--border)",borderRadius:6,padding:"2px 4px",fontFamily:"inherit",background:"#fff",color:"var(--muted)"}}
+                      aria-label={`Set status for ${p.name}`}>
+                      {STATUS_ORDER.map(k=><option key={k} value={k}>{STATUS_META[k].label}</option>)}
+                    </select>
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+        <div className="src" style={{marginTop:10}}>
+          Tip: use the checkboxes + the bar above to update everyone at once (e.g. mark a shared workshop complete for the whole cohort). The per-row dropdown handles one-off changes. Evidence that needs individual review should be opened per participant on the Participants screen.
+        </div>
       </div>
     </div>
   )
